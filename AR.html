@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARcodm • Subscription Panel</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:#f5f7fb;color:#172033}
+.wrap{max-width:900px;margin:auto;padding:28px 16px}.hero,.card{background:#fff;border:1px solid #e8eaf1;border-radius:22px;box-shadow:0 12px 35px #17203312}
+.hero{padding:25px;margin-bottom:18px;background:linear-gradient(135deg,#fff,#f7f1ff)}
+h1{margin:0 0 7px;color:#7c3aed}.muted{color:#697386}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.card{padding:20px;margin-bottom:18px}
+label{display:block;font-weight:700;margin-bottom:7px}input,select,textarea{width:100%;border:1px solid #dfe3eb;border-radius:13px;padding:12px;font:inherit;background:#fff}textarea{min-height:220px;direction:ltr;text-align:left}
+button{border:0;border-radius:13px;padding:13px 18px;font-weight:800;cursor:pointer;background:#7c3aed;color:#fff;transition:.2s}button:hover{transform:translateY(-2px);filter:brightness(1.05)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.status{padding:12px;border-radius:13px;background:#f2f4f8;margin-top:12px;word-break:break-all}.ok{background:#ecfdf5;color:#047857}.err{background:#fef2f2;color:#b91c1c}.hidden{display:none}
+@media(max-width:650px){.grid{grid-template-columns:1fr}.wrap{padding:15px}.hero,.card{border-radius:17px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<section class="hero">
+<h1>ARcodm</h1>
+<div>پنل ساخت و مدیریت Subscription</div>
+<p class="muted">ساخت لینک ساب واقعی و قابل دریافت از سرور</p>
+</section>
+
+<section class="card">
+<div class="grid">
+<div><label>نام کانفیگ</label><input id="name" placeholder="مثلاً ARcodm Gaming"></div>
+<div><label>مدت (روز)</label><input id="days" type="number" min="1" value="30"></div>
+</div>
+<br>
+<label>کانفیگ WireGuard</label>
+<textarea id="config" placeholder="[Interface]
+PrivateKey = ...
+Address = 10.0.0.2/32
+DNS = 1.1.1.1
+
+[Peer]
+PublicKey = ...
+AllowedIPs = 0.0.0.0/0, ::/0
+Endpoint = example.com:51820"></textarea>
+<br>
+<div class="row">
+<button id="create">ساخت Subscription</button>
+<button id="load" type="button">بررسی لینک</button>
+</div>
+<div id="status" class="status">آماده</div>
+</section>
+
+<section class="card">
+<label>لینک Subscription</label>
+<input id="url" readonly placeholder="بعد از ساخت اینجا نمایش داده می‌شود">
+<br><br>
+<label>خروجی ساب</label>
+<textarea id="output" readonly placeholder="محتوای Subscription اینجا نمایش داده می‌شود"></textarea>
+</section>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+let lastUrl="";
+
+function show(msg,type=""){ $("status").textContent=msg; $("status").className="status "+type; }
+
+$("create").onclick=async()=>{
+  const content=$("config").value.trim();
+  if(!content){show("ابتدا یک کانفیگ وارد کنید.","err");return;}
+  show("در حال ساخت Subscription...");
+  try{
+    const r=await fetch("/api/subscriptions",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        panelName:$("name").value.trim()||"ARcodm",
+        profile:$("name").value.trim()||"ARcodm",
+        days:$("days").value,
+        configs:[{name:$("name").value.trim()||"ARcodm",days:$("days").value,content}]
+      })
+    });
+    const d=await r.json();
+    if(!r.ok||!d.ok) throw new Error(d.error||"خطا در ساخت ساب");
+    lastUrl=d.url;$("url").value=d.url;
+    show("Subscription با موفقیت ساخته شد.","ok");
+    await loadSubscription(d.url);
+  }catch(e){show(e.message,"err")}
+};
+
+async function loadSubscription(url){
+  const r=await fetch(url);
+  const text=await r.text();
+  if(!r.ok) throw new Error(text||"خطا در دریافت ساب");
+  $("output").value=text;
+}
+
+$("load").onclick=async()=>{
+  const url=$("url").value.trim();
+  if(!url){show("لینک ساب هنوز ساخته نشده.","err");return;}
+  try{await loadSubscription(url);show("ساب سالم است و با موفقیت دریافت شد.","ok")}
+  catch(e){show(e.message,"err")}
+};
+</script>
+</body>
+</html>
